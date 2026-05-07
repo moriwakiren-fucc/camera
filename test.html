@@ -2,212 +2,377 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/piexifjs"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
 <style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 body,html{
-  margin:0;padding:0;height:100%;background:black;overflow:hidden;
+  margin:0;padding:0;width:100%;height:100%;
+  background:#000;overflow:hidden;
+  font-family:'DM Mono',monospace;
 }
-#cameraContainer{
-  position:relative;width:100%;height:100%;background:black;
-}
+
+/* ===== VIEWFINDER ===== */
+#app{position:relative;width:100%;height:100%;background:#000;}
+
 video{
-  width:100%;height:100%;object-fit:cover;
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;
+  transition:opacity 0.05s;
 }
 
-/* フォーカスオーバーレイCanvas */
+/* フラッシュ */
+#flash{
+  position:absolute;inset:0;
+  background:#fff;opacity:0;
+  pointer-events:none;z-index:50;
+  transition:opacity 0.05s;
+}
+
+/* ===== AF CANVAS ===== */
 #afCanvas{
-  position:absolute;
-  top:0;left:0;width:100%;height:100%;
-  pointer-events:none;
-  z-index:15;
+  position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;z-index:15;
 }
 
-/* タップAFサークル */
-#focusCircle{
+/* ===== FOCUS RING ===== */
+#focusRing{
   position:absolute;
-  width:70px;height:70px;
-  border:2px solid #FFD700;
-  border-radius:50%;
-  pointer-events:none;
+  width:64px;height:64px;
+  border:1.5px solid rgba(255,210,0,0.9);
   display:none;
   transform:translate(-50%,-50%);
   z-index:20;
-  box-shadow:0 0 0 1px rgba(0,0,0,0.4);
-  transition:opacity 0.3s;
+  pointer-events:none;
 }
-#focusCircle::before,#focusCircle::after{
-  content:'';position:absolute;background:#FFD700;
+/* コーナーのみ表示 */
+#focusRing::before,#focusRing::after{
+  content:'';position:absolute;
+  width:12px;height:12px;
+  border-color:rgba(255,210,0,0.9);
+  border-style:solid;
 }
-#focusCircle::before{
-  width:10px;height:1px;top:50%;left:-14px;
-  transform:translateY(-50%);box-shadow:73px 0 0 #FFD700;
-}
-#focusCircle::after{
-  width:1px;height:10px;left:50%;top:-14px;
-  transform:translateX(-50%);box-shadow:0 73px 0 #FFD700;
-}
+#focusRing::before{top:-1px;left:-1px;border-width:2px 0 0 2px;}
+#focusRing::after{bottom:-1px;right:-1px;border-width:0 2px 2px 0;}
 
-/* AFモード切替ボタン */
-#afModeBtn{
-  position:absolute;
-  top:20px;right:20px;
-  padding:8px 14px;
-  border-radius:20px;
-  border:none;
-  background:rgba(0,0,0,0.55);
-  color:#FFD700;
-  font-size:0.85rem;
-  font-weight:bold;
-  cursor:pointer;
+/* ===== TOP BAR ===== */
+#topBar{
+  position:absolute;top:0;left:0;right:0;
+  height:56px;
+  background:linear-gradient(to bottom,rgba(0,0,0,0.7),transparent);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 18px;
   z-index:30;
-  letter-spacing:0.05em;
+}
+.topLabel{
+  font-size:10px;letter-spacing:0.15em;
+  color:rgba(255,255,255,0.45);text-transform:uppercase;
+}
+#zoomBadge{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:22px;letter-spacing:0.05em;
+  color:#fff;
+}
+#afModeBtn{
+  font-size:10px;letter-spacing:0.12em;
+  color:rgba(255,210,0,0.9);
+  background:rgba(255,210,0,0.08);
+  border:1px solid rgba(255,210,0,0.3);
+  border-radius:4px;padding:5px 10px;
+  cursor:pointer;white-space:nowrap;
+}
+#photoCount{
+  font-size:11px;color:rgba(255,255,255,0.5);
+  letter-spacing:0.1em;min-width:40px;text-align:right;
 }
 
-/* 共通ボタン */
-.shutterBtn{
-  position:absolute;width:80px;height:80px;border-radius:50%;
-  background:#FFFFFF90;border:4px solid rgba(255,255,255,0.5);cursor:pointer;z-index:10;
+/* ===== ZOOM STRIP ===== */
+#zoomStrip{
+  position:absolute;
+  bottom:130px;left:50%;
+  transform:translateX(-50%);
+  display:flex;gap:6px;align-items:center;
+  z-index:30;
+  background:rgba(0,0,0,0.35);
+  border-radius:20px;padding:5px 10px;
+  backdrop-filter:blur(6px);
 }
-.switchCamBtn{
-  position:absolute;width:50px;height:50px;border-radius:50%;
-  background:rgba(255,255,255,0.7);border:none;cursor:pointer;z-index:10;
+.zoomPreset{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:15px;color:rgba(255,255,255,0.55);
+  padding:4px 8px;border-radius:14px;
+  border:none;background:transparent;cursor:pointer;
+  letter-spacing:0.05em;transition:all 0.15s;
 }
-.zoomContainer{
-  position:absolute;margin:auto;color:white;font-size:1rem;z-index:10;
+.zoomPreset.active{
+  color:#000;background:rgba(255,255,255,0.92);
+  font-size:16px;padding:4px 10px;
 }
-#zoomSlider-bottom{width:100%;}
-#zoomSlider-right{height:100%;}
+#zoomSlider{
+  display:none; /* スライダーは非表示、プリセットで操作 */
+}
 
-#shutterBtn-bottom{bottom:40px;left:50%;transform:translateX(-50%);}
-#zoomContainer-bottom{bottom:120px;left:50%;width:200px;transform:translateX(-50%);text-align:center;}
-#switchCamBtn-bottom{bottom:180px;left:50%;transform:translateX(-50%);}
+/* ===== BOTTOM BAR ===== */
+#bottomBar{
+  position:absolute;bottom:0;left:0;right:0;
+  height:130px;
+  background:linear-gradient(to top,rgba(0,0,0,0.85) 70%,transparent);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px 16px;
+  z-index:30;
+}
 
-#shutterBtn-right{right:40px;top:50%;transform:translateY(-50%);}
-#zoomContainer-right{right:120px;top:50%;height:200px;transform:translateY(-50%);transform:rotate(-0.25turn);vertical-align:middle;}
-#switchCamBtn-right{right:180px;top:50%;transform:translateY(-50%);}
-
+/* ギャラリーサムネ */
 #galleryBtn{
-  position:absolute;bottom:40px;left:20px;width:60px;height:60px;
-  border-radius:10px;background:rgba(255,255,255,0.3);border:none;cursor:pointer;overflow:hidden;
+  width:56px;height:56px;border-radius:10px;
+  background:rgba(255,255,255,0.12);
+  border:1.5px solid rgba(255,255,255,0.2);
+  cursor:pointer;overflow:hidden;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;
+  transition:transform 0.1s;
 }
+#galleryBtn:active{transform:scale(0.92);}
+
+/* シャッターボタン */
+#shutterBtn{
+  width:76px;height:76px;border-radius:50%;
+  background:#fff;
+  border:3px solid rgba(255,255,255,0.4);
+  cursor:pointer;flex-shrink:0;
+  position:relative;
+  box-shadow:0 0 0 6px rgba(255,255,255,0.12);
+  transition:transform 0.08s, box-shadow 0.08s;
+}
+#shutterBtn:active{
+  transform:scale(0.88);
+  box-shadow:0 0 0 3px rgba(255,255,255,0.12);
+}
+#shutterBtn.shooting{background:#e0e0e0;}
+
+/* カメラ切替 */
+#switchCamBtn{
+  width:56px;height:56px;border-radius:50%;
+  background:rgba(255,255,255,0.12);
+  border:1.5px solid rgba(255,255,255,0.2);
+  cursor:pointer;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;
+  transition:transform 0.2s;
+}
+#switchCamBtn:active{transform:rotate(180deg) scale(0.9);}
+
+/* 横持ち用シャッター（右端） */
+#shutterBtnLandscape{
+  position:absolute;
+  right:28px;top:50%;transform:translateY(-50%);
+  width:72px;height:72px;border-radius:50%;
+  background:#fff;
+  border:3px solid rgba(255,255,255,0.4);
+  cursor:pointer;z-index:30;
+  box-shadow:0 0 0 5px rgba(255,255,255,0.12);
+  display:none;
+  transition:transform 0.08s;
+}
+#shutterBtnLandscape:active{transform:translateY(-50%) scale(0.88);}
+
+/* ===== GALLERY OVERLAY ===== */
 #galleryOverlay{
-  position:fixed;top:0;left:0;width:100%;height:100%;
-  background:rgba(0,0,0,0.8);display:none;flex-direction:column;
-  justify-content:center;align-items:center;overflow-y:auto;padding:20px;box-sizing:border-box;
+  position:fixed;inset:0;
+  background:#0a0a0a;
+  display:none;flex-direction:column;
+  z-index:100;
 }
-#galleryButtons{
-  position:fixed;top:20px;right:15px;display:flex;flex-direction:column;
-  align-items:flex-end;gap:20px;z-index:1000;
+#galleryHeader{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 24px 16px;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  flex-shrink:0;
 }
-.galleryControlBtn{
-  width:160px;padding:14px 0;font-size:1.1rem;text-align:center;
-  border:none;border-radius:8px;background:rgba(255,255,255,0.9);color:#000;
-  cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3);
+#galleryTitle{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:28px;letter-spacing:0.08em;color:#fff;
 }
-#galleryImages{
-  margin-top:140px;display:flex;flex-direction:column;align-items:center;gap:20px;
+#galleryActions{display:flex;gap:10px;}
+.galActionBtn{
+  font-family:'DM Mono',monospace;
+  font-size:11px;letter-spacing:0.1em;
+  padding:8px 14px;border-radius:6px;
+  border:1px solid rgba(255,255,255,0.15);
+  background:rgba(255,255,255,0.06);
+  color:#fff;cursor:pointer;
+  transition:background 0.15s;
 }
-.galleryItem img{max-width:80vw;max-height:60vh;display:block;margin-bottom:10px;}
-.galleryItem button{
-  display:block;width:120px;margin:10px auto;padding:10px 0;
-  border:none;border-radius:6px;background:rgba(255,255,255,0.9);cursor:pointer;
+.galActionBtn:active{background:rgba(255,255,255,0.14);}
+#closeGalleryBtn{
+  font-size:22px;color:rgba(255,255,255,0.6);
+  background:none;border:none;cursor:pointer;padding:4px 8px;
+}
+#galleryGrid{
+  flex:1;overflow-y:auto;
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:3px;padding:3px;
+}
+.galleryThumb{
+  aspect-ratio:1;overflow:hidden;cursor:pointer;
+  position:relative;background:#111;
+}
+.galleryThumb img{
+  width:100%;height:100%;object-fit:cover;
+  display:block;transition:transform 0.2s;
+}
+.galleryThumb:active img{transform:scale(0.96);}
+
+/* 個別写真ビュー */
+#photoViewer{
+  position:fixed;inset:0;background:#000;
+  display:none;flex-direction:column;
+  z-index:110;
+}
+#viewerImg{flex:1;object-fit:contain;width:100%;}
+#viewerBar{
+  display:flex;gap:12px;align-items:center;justify-content:center;
+  padding:16px;background:rgba(0,0,0,0.8);flex-shrink:0;
+}
+.viewerBtn{
+  font-family:'DM Mono',monospace;
+  font-size:12px;letter-spacing:0.08em;
+  padding:10px 20px;border-radius:6px;
+  border:1px solid rgba(255,255,255,0.2);
+  background:rgba(255,255,255,0.07);
+  color:#fff;cursor:pointer;
+}
+#viewerClose{
+  position:absolute;top:16px;right:16px;
+  font-size:26px;color:rgba(255,255,255,0.7);
+  background:none;border:none;cursor:pointer;z-index:1;
 }
 </style>
 </head>
 <body>
-<div id="cameraContainer">
-  <video id="camera" autoplay playsinline></video>
+<div id="app">
+  <video id="camera" autoplay playsinline muted></video>
+  <div id="flash"></div>
   <canvas id="afCanvas"></canvas>
-  <div id="focusCircle"></div>
-  <button id="afModeBtn">👆 タップAF</button>
-  <button id="galleryBtn">📷</button>
+  <div id="focusRing"></div>
 
-  <!-- 下 -->
-  <button id="shutterBtn-bottom" class="shutterBtn"></button>
-  <div id="zoomContainer-bottom" class="zoomContainer">
-    <div class="zoomValue">1.0x</div>
-    <input type="range" id="zoomSlider-bottom" min="1" max="3" step="0.1" value="1">
+  <!-- TOP BAR -->
+  <div id="topBar">
+    <div>
+      <div class="topLabel">ZOOM</div>
+      <div id="zoomBadge">1.0×</div>
+    </div>
+    <button id="afModeBtn">TAP AF</button>
+    <div id="photoCount">0 shots</div>
   </div>
-  <button id="switchCamBtn-bottom" class="switchCamBtn">⇆</button>
 
-  <!-- 右 -->
-  <button id="shutterBtn-right" class="shutterBtn"></button>
-  <div id="zoomContainer-right" class="zoomContainer">
-    <div class="zoomValue">1.0x</div>
-    <input type="range" id="zoomSlider-right" min="1" max="3" step="0.1" value="1">
+  <!-- ZOOM STRIP -->
+  <div id="zoomStrip">
+    <button class="zoomPreset active" data-zoom="1">1×</button>
+    <button class="zoomPreset" data-zoom="2">2×</button>
+    <button class="zoomPreset" data-zoom="3">3×</button>
   </div>
-  <button id="switchCamBtn-right" class="switchCamBtn">⇆</button>
+
+  <!-- BOTTOM BAR -->
+  <div id="bottomBar">
+    <button id="galleryBtn">📷</button>
+    <button id="shutterBtn"></button>
+    <button id="switchCamBtn">↺</button>
+  </div>
+
+  <!-- 横持ちシャッター -->
+  <button id="shutterBtnLandscape"></button>
 </div>
 
+<!-- GALLERY -->
 <div id="galleryOverlay">
-  <div id="galleryButtons">
-    <button id="closeGalleryBtn" class="galleryControlBtn">閉じる</button>
-    <button id="shareAllBtn" class="galleryControlBtn">全共有</button>
-    <button id="downloadAllBtn" class="galleryControlBtn">全ダウンロード</button>
+  <div id="galleryHeader">
+    <div id="galleryTitle">SHOTS</div>
+    <div id="galleryActions">
+      <button class="galActionBtn" id="shareAllBtn">SHARE ALL</button>
+      <button class="galActionBtn" id="downloadAllBtn">ZIP DL</button>
+    </div>
+    <button id="closeGalleryBtn">✕</button>
   </div>
-  <div id="galleryImages"></div>
+  <div id="galleryGrid"></div>
+</div>
+
+<!-- PHOTO VIEWER -->
+<div id="photoViewer">
+  <button id="viewerClose">✕</button>
+  <img id="viewerImg" src="" alt="">
+  <div id="viewerBar">
+    <button class="viewerBtn" id="viewerShare">SHARE</button>
+    <button class="viewerBtn" id="viewerDl">DOWNLOAD</button>
+  </div>
 </div>
 
 <script>
-const video=document.getElementById('camera');
-const afCanvas=document.getElementById('afCanvas');
-const ctx2d=afCanvas.getContext('2d');
-const focusCircle=document.getElementById('focusCircle');
-const afModeBtn=document.getElementById('afModeBtn');
-const galleryBtn=document.getElementById('galleryBtn');
-const galleryOverlay=document.getElementById('galleryOverlay');
-const closeGalleryBtn=document.getElementById('closeGalleryBtn');
-const shareAllBtn=document.getElementById('shareAllBtn');
-const downloadAllBtn=document.getElementById('downloadAllBtn');
-const galleryImages=document.getElementById('galleryImages');
+const video       = document.getElementById('camera');
+const flash       = document.getElementById('flash');
+const afCanvas    = document.getElementById('afCanvas');
+const ctx2d       = afCanvas.getContext('2d');
+const focusRing   = document.getElementById('focusRing');
+const afModeBtn   = document.getElementById('afModeBtn');
+const zoomBadge   = document.getElementById('zoomBadge');
+const photoCount  = document.getElementById('photoCount');
+const shutterBtn  = document.getElementById('shutterBtn');
+const shutterBtnL = document.getElementById('shutterBtnLandscape');
+const switchCamBtn= document.getElementById('switchCamBtn');
+const galleryBtn  = document.getElementById('galleryBtn');
+const galleryOverlay = document.getElementById('galleryOverlay');
+const galleryGrid = document.getElementById('galleryGrid');
+const closeGalleryBtn = document.getElementById('closeGalleryBtn');
+const shareAllBtn = document.getElementById('shareAllBtn');
+const downloadAllBtn  = document.getElementById('downloadAllBtn');
+const photoViewer = document.getElementById('photoViewer');
+const viewerImg   = document.getElementById('viewerImg');
+const viewerClose = document.getElementById('viewerClose');
+const viewerShare = document.getElementById('viewerShare');
+const viewerDl    = document.getElementById('viewerDl');
+const zoomPresets = document.querySelectorAll('.zoomPreset');
 
-let currentStream=null;
-let useFrontCamera=false;
-let photos=[];
-let focusTimer=null;
-let isPinching=false;
-let pinchStartDist=0;
-let pinchStartZoom=1;
+let currentStream = null;
+let useFrontCamera = false;
+let photos = [];
+let afMode = 'tap';
+let isShooting = false;
+let focusTimer = null;
+let isPinching = false;
+let pinchStartDist = 0;
+let pinchStartZoom = 1;
+let currentZoom = 1;
+let currentViewerIdx = -1;
 
-// AFモード: 'tap' | 'face'
-let afMode='tap';
-
-const shutterButtons=document.querySelectorAll('.shutterBtn');
-const zoomSliders=document.querySelectorAll('input[type=range]');
-const zoomValues=document.querySelectorAll('.zoomValue');
-const switchCamButtons=document.querySelectorAll('.switchCamBtn');
-
-// ---- 顔認識 (FaceDetector API) ----
-let faceDetector=null;
-let faceLoopRunning=false;
+// ---- FACE DETECTION ----
+let faceDetector = null;
+let faceLoopRunning = false;
 
 function initFaceDetector(){
   if('FaceDetector' in window){
-    faceDetector=new FaceDetector({fastMode:true,maxDetectedFaces:5});
+    faceDetector = new FaceDetector({fastMode:true, maxDetectedFaces:5});
     return true;
   }
   return false;
 }
-
 function startFaceDetection(){
   if(!faceDetector) return;
-  faceLoopRunning=true;
-
+  faceLoopRunning = true;
   async function loop(){
     if(!faceLoopRunning) return;
-    if(video.readyState>=2){
+    if(video.readyState >= 2){
       try{
-        const faces=await faceDetector.detect(video);
+        const faces = await faceDetector.detect(video);
         drawFaceBoxes(faces);
-        if(faces.length>0){
-          const f=faces[0];
-          const nx=(f.boundingBox.x+f.boundingBox.width/2)/video.videoWidth;
-          const ny=(f.boundingBox.y+f.boundingBox.height/2)/video.videoHeight;
-          applyFocusPoint(nx,ny);
-        } else {
-          clearFaceBoxes();
+        if(faces.length > 0){
+          const f = faces[0];
+          const nx = (f.boundingBox.x + f.boundingBox.width/2) / video.videoWidth;
+          const ny = (f.boundingBox.y + f.boundingBox.height/2) / video.videoHeight;
+          applyFocusPoint(nx, ny);
         }
       }catch(e){}
     }
@@ -215,361 +380,352 @@ function startFaceDetection(){
   }
   requestAnimationFrame(loop);
 }
-
 function stopFaceDetection(){
-  faceLoopRunning=false;
-  clearFaceBoxes();
+  faceLoopRunning = false;
+  ctx2d.clearRect(0,0,afCanvas.width,afCanvas.height);
 }
-
-function resizeCanvas(){
-  if(afCanvas.width!==afCanvas.offsetWidth||afCanvas.height!==afCanvas.offsetHeight){
-    afCanvas.width=afCanvas.offsetWidth;
-    afCanvas.height=afCanvas.offsetHeight;
-  }
-}
-
 function drawFaceBoxes(faces){
-  resizeCanvas();
+  afCanvas.width  = afCanvas.offsetWidth;
+  afCanvas.height = afCanvas.offsetHeight;
   ctx2d.clearRect(0,0,afCanvas.width,afCanvas.height);
   if(!faces.length) return;
-
-  const rect=video.getBoundingClientRect();
-  const scaleX=rect.width/video.videoWidth;
-  const scaleY=rect.height/video.videoHeight;
-
+  const rect = video.getBoundingClientRect();
+  const sx = rect.width  / video.videoWidth;
+  const sy = rect.height / video.videoHeight;
   faces.forEach((f,i)=>{
-    const x=f.boundingBox.x*scaleX;
-    const y=f.boundingBox.y*scaleY;
-    const w=f.boundingBox.width*scaleX;
-    const h=f.boundingBox.height*scaleY;
-    const color=i===0?'#FFD700':'#00CFFF';
-    const cl=Math.min(w,h)*0.22;
-
-    ctx2d.strokeStyle=color;
-    ctx2d.lineWidth=2.5;
-
-    // コーナーブラケット
+    const x=f.boundingBox.x*sx, y=f.boundingBox.y*sy;
+    const w=f.boundingBox.width*sx, h=f.boundingBox.height*sy;
+    const cl = Math.min(w,h)*0.2;
+    ctx2d.strokeStyle = i===0 ? 'rgba(255,210,0,0.9)' : 'rgba(80,200,255,0.7)';
+    ctx2d.lineWidth = 2;
     [[x,y,1,1],[x+w,y,-1,1],[x,y+h,1,-1],[x+w,y+h,-1,-1]].forEach(([cx,cy,dx,dy])=>{
       ctx2d.beginPath();
-      ctx2d.moveTo(cx+dx*cl,cy);
-      ctx2d.lineTo(cx,cy);
-      ctx2d.lineTo(cx,cy+dy*cl);
+      ctx2d.moveTo(cx+dx*cl, cy);
+      ctx2d.lineTo(cx, cy);
+      ctx2d.lineTo(cx, cy+dy*cl);
       ctx2d.stroke();
     });
-
     if(i===0){
-      ctx2d.fillStyle='rgba(255,215,0,0.9)';
-      ctx2d.font='bold 12px sans-serif';
-      ctx2d.fillText('AF',x+4,y>16?y-6:y+h+16);
+      ctx2d.fillStyle='rgba(255,210,0,0.85)';
+      ctx2d.font='bold 11px DM Mono,monospace';
+      ctx2d.fillText('AF', x+4, y>14 ? y-5 : y+h+14);
     }
   });
 }
 
-function clearFaceBoxes(){
-  resizeCanvas();
-  ctx2d.clearRect(0,0,afCanvas.width,afCanvas.height);
-}
-
-// ---- フォーカスポイント適用 ----
-async function applyFocusPoint(nx,ny){
-  const track=currentStream?.getVideoTracks()[0];
+// ---- FOCUS ----
+async function applyFocusPoint(nx, ny){
+  const track = currentStream?.getVideoTracks()[0];
   if(!track) return;
-  const cap=track.getCapabilities?.();
-  if(cap?.focusMode?.includes('manual')&&cap?.pointsOfInterest){
+  const cap = track.getCapabilities?.();
+  if(cap?.focusMode?.includes('manual') && cap?.pointsOfInterest){
     try{
-      await track.applyConstraints({advanced:[{focusMode:'manual',pointsOfInterest:[{x:nx,y:ny}]}]});
+      await track.applyConstraints({advanced:[{focusMode:'manual', pointsOfInterest:[{x:nx, y:ny}]}]});
     }catch(e){}
   }
 }
 
-// ---- タップAF ----
-async function applyTapFocus(nx,ny,clientX,clientY){
-  focusCircle.style.left=clientX+'px';
-  focusCircle.style.top=clientY+'px';
-  focusCircle.style.display='block';
-  focusCircle.style.opacity='1';
-  focusCircle.style.transform='translate(-50%,-50%) scale(1.3)';
-  focusCircle.style.transition='transform 0.15s ease, opacity 0.3s';
-  requestAnimationFrame(()=>{ focusCircle.style.transform='translate(-50%,-50%) scale(1)'; });
-
+async function applyTapFocus(nx, ny, cx, cy){
+  focusRing.style.left = cx+'px';
+  focusRing.style.top  = cy+'px';
+  focusRing.style.display = 'block';
+  focusRing.style.opacity = '1';
+  focusRing.style.transform = 'translate(-50%,-50%) scale(1.4)';
+  focusRing.style.transition = 'none';
+  requestAnimationFrame(()=>{
+    focusRing.style.transition = 'transform 0.2s ease, opacity 0.4s';
+    focusRing.style.transform  = 'translate(-50%,-50%) scale(1)';
+  });
   if(focusTimer) clearTimeout(focusTimer);
-  focusTimer=setTimeout(()=>{
-    focusCircle.style.opacity='0';
-    setTimeout(()=>focusCircle.style.display='none',300);
-  },2000);
-
-  await applyFocusPoint(nx,ny);
-
-  const track=currentStream?.getVideoTracks()[0];
-  const cap=track?.getCapabilities?.();
+  focusTimer = setTimeout(()=>{
+    focusRing.style.opacity = '0';
+    setTimeout(()=>focusRing.style.display='none', 400);
+  }, 2000);
+  await applyFocusPoint(nx, ny);
+  const track = currentStream?.getVideoTracks()[0];
+  const cap = track?.getCapabilities?.();
   setTimeout(async()=>{
     if(cap?.focusMode?.includes('continuous')){
       try{ await track.applyConstraints({advanced:[{focusMode:'continuous'}]}); }catch(e){}
     }
-  },1500);
+  }, 1500);
 }
 
-// ---- AFモード切替 ----
-afModeBtn.addEventListener('click',()=>{
-  if(afMode==='tap'){
-    if(!faceDetector&&!initFaceDetector()){
-      alert('このブラウザは顔認識AF（FaceDetector API）に対応していません。\nChrome for Android などでお試しください。');
+// ---- AF MODE ----
+afModeBtn.addEventListener('click', ()=>{
+  if(afMode === 'tap'){
+    if(!faceDetector && !initFaceDetector()){
+      alert('このブラウザは顔認識AF（FaceDetector API）に対応していません。');
       return;
     }
-    afMode='face';
-    afModeBtn.textContent='😊 顔認識AF';
-    focusCircle.style.display='none';
+    afMode = 'face';
+    afModeBtn.textContent = 'FACE AF';
+    afModeBtn.style.color = 'rgba(80,200,255,0.9)';
+    afModeBtn.style.borderColor = 'rgba(80,200,255,0.3)';
+    afModeBtn.style.background = 'rgba(80,200,255,0.08)';
+    focusRing.style.display = 'none';
     startFaceDetection();
   } else {
-    afMode='tap';
-    afModeBtn.textContent='👆 タップAF';
+    afMode = 'tap';
+    afModeBtn.textContent = 'TAP AF';
+    afModeBtn.style.color = 'rgba(255,210,0,0.9)';
+    afModeBtn.style.borderColor = 'rgba(255,210,0,0.3)';
+    afModeBtn.style.background = 'rgba(255,210,0,0.08)';
     stopFaceDetection();
   }
 });
 
-// ---- タップ・ピンチ ----
-const container=document.getElementById('cameraContainer');
+// ---- TOUCH: TAP / PINCH ----
+const app = document.getElementById('app');
 
-container.addEventListener('touchstart',e=>{
-  if(e.touches.length===2){
-    isPinching=true;
-    pinchStartDist=Math.hypot(
-      e.touches[0].clientX-e.touches[1].clientX,
-      e.touches[0].clientY-e.touches[1].clientY
+app.addEventListener('touchstart', e=>{
+  if(e.touches.length === 2){
+    isPinching = true;
+    pinchStartDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
     );
-    const track=currentStream?.getVideoTracks()[0];
-    pinchStartZoom=track?.getSettings()?.zoom||parseFloat(zoomSliders[0].value);
+    pinchStartZoom = currentZoom;
   } else {
-    isPinching=false;
+    isPinching = false;
   }
 },{passive:true});
 
-container.addEventListener('touchend',e=>{
+app.addEventListener('touchend', e=>{
   if(isPinching){ isPinching=false; return; }
-  if(afMode!=='tap') return;
-  if(e.target!==video&&e.target!==container&&e.target!==afCanvas) return;
-  if(e.changedTouches.length===1){
-    const t=e.changedTouches[0];
-    const rect=video.getBoundingClientRect();
+  if(afMode !== 'tap') return;
+  const ignore = [shutterBtn,shutterBtnL,switchCamBtn,galleryBtn,afModeBtn];
+  if(ignore.some(b=>b.contains(e.target))) return;
+  if(e.changedTouches.length === 1){
+    const t = e.changedTouches[0];
+    const rect = video.getBoundingClientRect();
     applyTapFocus(
       (t.clientX-rect.left)/rect.width,
       (t.clientY-rect.top)/rect.height,
-      t.clientX,t.clientY
+      t.clientX, t.clientY
     );
   }
 },{passive:true});
 
-container.addEventListener('click',e=>{
-  if(afMode!=='tap') return;
-  if(e.target!==video&&e.target!==container&&e.target!==afCanvas) return;
-  const rect=video.getBoundingClientRect();
-  applyTapFocus(
-    (e.clientX-rect.left)/rect.width,
-    (e.clientY-rect.top)/rect.height,
-    e.clientX,e.clientY
-  );
-});
-
-container.addEventListener('touchmove',e=>{
-  if(e.touches.length===2){
+app.addEventListener('touchmove', e=>{
+  if(e.touches.length === 2){
     e.preventDefault();
-    const newDist=Math.hypot(
-      e.touches[0].clientX-e.touches[1].clientX,
-      e.touches[0].clientY-e.touches[1].clientY
+    const d = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
     );
-    const scale=newDist/pinchStartDist;
-    const track=currentStream?.getVideoTracks()[0];
-    const cap=track?.getCapabilities?.();
+    const track = currentStream?.getVideoTracks()[0];
+    const cap = track?.getCapabilities?.();
     if(cap?.zoom){
-      const newZoom=Math.min(cap.zoom.max,Math.max(cap.zoom.min,pinchStartZoom*scale));
-      applyZoom(newZoom);
+      const z = Math.min(cap.zoom.max, Math.max(cap.zoom.min, pinchStartZoom*(d/pinchStartDist)));
+      applyZoom(z);
     }
   }
 },{passive:false});
 
-// ---- カメラ ----
+// PC click AF
+app.addEventListener('click', e=>{
+  if(afMode !== 'tap') return;
+  const ignore = [shutterBtn,shutterBtnL,switchCamBtn,galleryBtn,afModeBtn];
+  if(ignore.some(b=>b.contains(e.target))) return;
+  const rect = video.getBoundingClientRect();
+  applyTapFocus(
+    (e.clientX-rect.left)/rect.width,
+    (e.clientY-rect.top)/rect.height,
+    e.clientX, e.clientY
+  );
+});
+
+// ---- ZOOM PRESETS ----
+zoomPresets.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const z = parseFloat(btn.dataset.zoom);
+    applyZoom(z);
+    zoomPresets.forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+function applyZoom(value){
+  const track = currentStream?.getVideoTracks()[0];
+  const cap = track?.getCapabilities?.();
+  if(cap?.zoom){
+    const z = Math.min(cap.zoom.max, Math.max(cap.zoom.min, value));
+    track.applyConstraints({advanced:[{zoom:z}]});
+    currentZoom = z;
+    zoomBadge.textContent = z.toFixed(1)+'×';
+    // プリセットのアクティブ更新
+    const closest = [1,2,3].reduce((a,b)=>Math.abs(b-z)<Math.abs(a-z)?b:a);
+    if(Math.abs(closest-z)<0.15){
+      zoomPresets.forEach(b=>b.classList.toggle('active', parseFloat(b.dataset.zoom)===closest));
+    } else {
+      zoomPresets.forEach(b=>b.classList.remove('active'));
+    }
+  } else {
+    // ズーム非対応でも表示更新
+    currentZoom = value;
+    zoomBadge.textContent = value.toFixed(1)+'×';
+  }
+}
+
+// ---- CAMERA ----
 async function startCamera(){
   if(currentStream) currentStream.getTracks().forEach(t=>t.stop());
-  currentStream=await navigator.mediaDevices.getUserMedia({
-    video:{facingMode:useFrontCamera?'user':'environment',width:{ideal:9999},height:{ideal:9999}},
+  currentStream = await navigator.mediaDevices.getUserMedia({
+    video:{facingMode: useFrontCamera?'user':'environment', width:{ideal:9999}, height:{ideal:9999}},
     audio:false
   });
-  video.srcObject=currentStream;
-  applyZoom(parseFloat(zoomSliders[0].value));
+  video.srcObject = currentStream;
+  applyZoom(currentZoom);
   if(afMode==='face') startFaceDetection();
 }
 
-function applyZoom(value){
-  const track=currentStream?.getVideoTracks()[0];
-  const cap=track?.getCapabilities?.();
-  if(cap?.zoom){
-    track.applyConstraints({advanced:[{zoom:value}]});
-    zoomValues.forEach(v=>v.textContent=value.toFixed(1)+'x');
-    zoomSliders.forEach(s=>s.value=value);
-  }
-}
-
-zoomSliders.forEach(slider=>{
-  slider.addEventListener('input',e=>applyZoom(parseFloat(e.target.value)));
+switchCamBtn.addEventListener('click', ()=>{
+  useFrontCamera = !useFrontCamera;
+  stopFaceDetection();
+  startCamera();
 });
 
-switchCamButtons.forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    useFrontCamera=!useFrontCamera;
-    stopFaceDetection();
-    startCamera();
-  });
-});
+// ---- INSTANT SHUTTER ----
+async function shoot(){
+  if(isShooting) return;
+  isShooting = true;
+  shutterBtn.classList.add('shooting');
+  shutterBtnL.classList.add('shooting');
 
-// ---- シャープネス計測（ラプラシアン分散） ----
-function measureSharpness(videoEl){
-  const sw=160, sh=Math.round(160*videoEl.videoHeight/videoEl.videoWidth);
-  const tmp=document.createElement('canvas');
-  tmp.width=sw; tmp.height=sh;
-  const tc=tmp.getContext('2d');
-  tc.drawImage(videoEl,0,0,sw,sh);
-  const {data}=tc.getImageData(0,0,sw,sh);
-  // グレースケール変換してラプラシアン計算
-  const gray=new Float32Array(sw*sh);
-  for(let i=0;i<sw*sh;i++) gray[i]=(data[i*4]*0.299+data[i*4+1]*0.587+data[i*4+2]*0.114);
-  let sum=0,count=0;
-  for(let y=1;y<sh-1;y++){
-    for(let x=1;x<sw-1;x++){
-      const lap=
-        -gray[(y-1)*sw+x]-gray[(y+1)*sw+x]
-        -gray[y*sw+(x-1)]-gray[y*sw+(x+1)]
-        +4*gray[y*sw+x];
-      sum+=lap*lap; count++;
+  // フラッシュ
+  flash.style.opacity = '0.75';
+  setTimeout(()=> flash.style.opacity='0', 80);
+
+  // 3フレーム取得・最もシャープなものを選択（約0.3秒）
+  function sharpness(v){
+    const sw=120, sh=Math.round(120*v.videoHeight/v.videoWidth);
+    const t=document.createElement('canvas'); t.width=sw; t.height=sh;
+    const tc=t.getContext('2d'); tc.drawImage(v,0,0,sw,sh);
+    const {data}=tc.getImageData(0,0,sw,sh);
+    const g=new Float32Array(sw*sh);
+    for(let i=0;i<sw*sh;i++) g[i]=data[i*4]*0.299+data[i*4+1]*0.587+data[i*4+2]*0.114;
+    let s=0;
+    for(let y=1;y<sh-1;y++) for(let x=1;x<sw-1;x++){
+      const l=-g[(y-1)*sw+x]-g[(y+1)*sw+x]-g[y*sw+x-1]-g[y*sw+x+1]+4*g[y*sw+x];
+      s+=l*l;
     }
+    return s/((sw-2)*(sh-2));
   }
-  return sum/count;
+  let bestCanvas=null, bestScore=-1;
+  for(let i=0;i<3;i++){
+    if(i>0) await new Promise(r=>setTimeout(r,100));
+    const c=document.createElement('canvas');
+    c.width=video.videoWidth; c.height=video.videoHeight;
+    c.getContext('2d').drawImage(video,0,0);
+    const sc=sharpness(video);
+    if(sc>bestScore){ bestScore=sc; bestCanvas=c; }
+  }
+  const canvas = bestCanvas;
+
+  const now = new Date();
+  const pad = n=>n.toString().padStart(2,'0');
+  const ts  = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const filename = `${ts}.jpg`;
+
+  const jpegDataURL = canvas.toDataURL('image/jpeg', 0.95);
+  let exifObj = {"0th":{},"Exif":{},"GPS":{}};
+  const dateStr = `${now.getFullYear()}:${pad(now.getMonth()+1)}:${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  exifObj["0th"][piexif.ImageIFD.DateTime] = dateStr;
+  exifObj["Exif"][piexif.ExifIFD.DateTimeOriginal] = dateStr;
+  exifObj["Exif"][piexif.ExifIFD.DateTimeDigitized] = dateStr;
+  const newJpeg = piexif.insert(piexif.dump(exifObj), jpegDataURL);
+
+  const blob = await (await fetch(newJpeg)).blob();
+  const url  = URL.createObjectURL(blob);
+  photos.unshift({blob, filename, url});
+
+  // ギャラリーボタン更新
+  galleryBtn.style.backgroundImage = `url(${url})`;
+  galleryBtn.style.backgroundSize  = 'cover';
+  galleryBtn.textContent = '';
+  photoCount.textContent = photos.length + ' shot' + (photos.length!==1?'s':'');
+
+  setTimeout(()=>{
+    shutterBtn.classList.remove('shooting');
+    shutterBtnL.classList.remove('shooting');
+    isShooting = false;
+  }, 150);
 }
 
-// ---- カウントダウンオーバーレイ ----
-const countdownEl=document.createElement('div');
-Object.assign(countdownEl.style,{
-  position:'fixed',top:'50%',left:'50%',
-  transform:'translate(-50%,-50%)',
-  fontSize:'96px',fontWeight:'bold',color:'white',
-  textShadow:'0 0 20px rgba(0,0,0,0.8)',
-  zIndex:'100',display:'none',pointerEvents:'none',
-  fontFamily:'sans-serif',lineHeight:'1'
-});
-document.body.appendChild(countdownEl);
+shutterBtn.addEventListener('click', shoot);
+shutterBtnL.addEventListener('click', shoot);
 
-function showCountdown(n){
-  return new Promise(res=>{
-    countdownEl.style.display='block';
-    countdownEl.textContent=n;
-    countdownEl.style.opacity='1';
-    countdownEl.style.transform='translate(-50%,-50%) scale(1.2)';
-    countdownEl.style.transition='none';
-    requestAnimationFrame(()=>{
-      countdownEl.style.transition='transform 0.8s ease, opacity 0.8s ease';
-      countdownEl.style.transform='translate(-50%,-50%) scale(0.8)';
-      countdownEl.style.opacity='0.2';
-    });
-    setTimeout(res, 900);
+// ---- GALLERY ----
+galleryBtn.addEventListener('click', ()=>{
+  buildGrid();
+  galleryOverlay.style.display = 'flex';
+});
+
+function buildGrid(){
+  galleryGrid.innerHTML = '';
+  photos.forEach((photo, i)=>{
+    const div = document.createElement('div');
+    div.className = 'galleryThumb';
+    const img = document.createElement('img');
+    img.src = photo.url;
+    img.loading = 'lazy';
+    div.appendChild(img);
+    div.addEventListener('click', ()=> openViewer(i));
+    galleryGrid.appendChild(div);
   });
 }
 
-let isShooting=false;
+closeGalleryBtn.addEventListener('click', ()=> galleryOverlay.style.display='none');
 
-// ---- 撮影 ----
-shutterButtons.forEach(btn=>{
-  btn.addEventListener('click',async()=>{
-    if(isShooting) return;
-    isShooting=true;
-
-    // 5フレーム取得し最もシャープなものを選択
-    const FRAMES=5, INTERVAL=120;
-    let bestCanvas=null, bestScore=-1;
-    for(let i=0;i<FRAMES;i++){
-      await new Promise(r=>setTimeout(r,INTERVAL));
-      const c=document.createElement('canvas');
-      c.width=video.videoWidth; c.height=video.videoHeight;
-      c.getContext('2d').drawImage(video,0,0);
-      const score=measureSharpness(video);
-      if(score>bestScore){ bestScore=score; bestCanvas=c; }
-    }
-
-    // JPEG + EXIF書き込み
-    const now=new Date();
-    const pad=n=>n.toString().padStart(2,'0');
-    const ts=`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    const filename=`${ts}.jpg`;
-
-    const jpegDataURL=bestCanvas.toDataURL('image/jpeg',0.95);
-    let exifObj={"0th":{},"Exif":{},"GPS":{}};
-    const dateStr=`${now.getFullYear()}:${pad(now.getMonth()+1)}:${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    exifObj["0th"][piexif.ImageIFD.DateTime]=dateStr;
-    exifObj["Exif"][piexif.ExifIFD.DateTimeOriginal]=dateStr;
-    exifObj["Exif"][piexif.ExifIFD.DateTimeDigitized]=dateStr;
-    const exifBytes=piexif.dump(exifObj);
-    const newJpeg=piexif.insert(exifBytes,jpegDataURL);
-
-    const blob=await(await fetch(newJpeg)).blob();
-    photos.unshift({blob,filename});
-    galleryBtn.style.backgroundImage=`url(${URL.createObjectURL(blob)})`;
-    galleryBtn.style.backgroundSize='cover';
-
-    // シャッターフラッシュ
-    const track=video.srcObject.getVideoTracks()[0];
-    track.enabled=false;
-    setTimeout(()=>{ track.enabled=true; isShooting=false; },250);
-  });
-});
-
-// ---- ギャラリー ----
-galleryBtn.addEventListener('click',()=>{
-  galleryImages.innerHTML='';
-  photos.forEach(photo=>{
-    const item=document.createElement('div');
-    item.className='galleryItem';
-    const img=document.createElement('img');
-    img.src=URL.createObjectURL(photo.blob);
-
-    const shareBtn=document.createElement('button');
-    shareBtn.textContent='共有';
-    shareBtn.onclick=async()=>{
-      const file=new File([photo.blob],photo.filename,{type:'image/jpeg'});
-      if(navigator.canShare&&navigator.canShare({files:[file]})){
-        try{await navigator.share({files:[file],title:'写真共有'});}catch(e){}
-      }
-    };
-
-    const dlBtn=document.createElement('button');
-    dlBtn.textContent='ダウンロード';
-    dlBtn.onclick=()=>{
-      const a=document.createElement('a');
-      a.href=img.src;a.download=photo.filename;a.click();
-    };
-
-    item.append(img,shareBtn,dlBtn);
-    galleryImages.appendChild(item);
-  });
-  galleryOverlay.style.display='flex';
-});
-
-shareAllBtn.onclick=async()=>{
-  const files=photos.map(p=>new File([p.blob],p.filename,{type:'image/jpeg'}));
+shareAllBtn.addEventListener('click', async()=>{
+  const files = photos.map(p=>new File([p.blob],p.filename,{type:'image/jpeg'}));
   if(navigator.canShare&&navigator.canShare({files})){
-    try{await navigator.share({files,title:'全共有'});}catch(e){}
+    try{ await navigator.share({files, title:'Photos'}); }catch(e){}
   }
-};
+});
 
-downloadAllBtn.onclick=async()=>{
-  const zip=new JSZip();
-  photos.forEach(p=>zip.file(p.filename,p.blob));
-  const content=await zip.generateAsync({type:'blob'});
-  const url=URL.createObjectURL(content);
-  const a=document.createElement('a');
-  a.href=url;a.download='photos.zip';a.click();
-  URL.revokeObjectURL(url);
-};
+downloadAllBtn.addEventListener('click', async()=>{
+  const zip = new JSZip();
+  photos.forEach(p=>zip.file(p.filename, p.blob));
+  const content = await zip.generateAsync({type:'blob'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(content);
+  a.download = 'photos.zip';
+  a.click();
+});
 
-closeGalleryBtn.onclick=()=>galleryOverlay.style.display='none';
+// ---- VIEWER ----
+function openViewer(idx){
+  currentViewerIdx = idx;
+  viewerImg.src = photos[idx].url;
+  photoViewer.style.display = 'flex';
+}
+viewerClose.addEventListener('click', ()=> photoViewer.style.display='none');
 
+viewerShare.addEventListener('click', async()=>{
+  const p = photos[currentViewerIdx];
+  const file = new File([p.blob], p.filename, {type:'image/jpeg'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], title:'Photo'}); }catch(e){}
+  }
+});
+viewerDl.addEventListener('click', ()=>{
+  const p = photos[currentViewerIdx];
+  const a = document.createElement('a');
+  a.href = p.url; a.download = p.filename; a.click();
+});
+
+// ---- ORIENTATION ----
+function handleOrientation(){
+  const landscape = window.innerWidth > window.innerHeight;
+  shutterBtnL.style.display = landscape ? 'block' : 'none';
+  shutterBtn.style.display  = landscape ? 'none'  : 'block';
+}
+window.addEventListener('resize', handleOrientation);
+handleOrientation();
+
+// ---- INIT ----
 startCamera();
 </script>
 </body>
