@@ -614,7 +614,7 @@ async function shoot(){
   }
   let bestCanvas=null, bestScore=-1;
   for(let i=0;i<3;i++){
-    if(i>0) await new Promise(r=>setTimeout(r,100));
+    if(i>0) await new Promise(r=>setTimeout(r,50));
     const c=document.createElement('canvas');
     c.width=video.videoWidth; c.height=video.videoHeight;
     c.getContext('2d').drawImage(video,0,0);
