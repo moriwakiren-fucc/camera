@@ -7,29 +7,27 @@
 <script src="https://cdn.jsdelivr.net/npm/piexifjs"></script>
 <style>
 body,html{
-  margin:0;
-  padding:0;
-  height:100%;
-  background:black;
-  overflow:hidden;
+  margin:0;padding:0;height:100%;background:black;overflow:hidden;
 }
 #cameraContainer{
-  position:relative;
-  width:100%;
-  height:100%;
-  background:black;
+  position:relative;width:100%;height:100%;background:black;
 }
 video{
-  width:100%;
-  height:100%;
-  object-fit:cover;
+  width:100%;height:100%;object-fit:cover;
 }
 
-/* フォーカスサークル */
+/* フォーカスオーバーレイCanvas */
+#afCanvas{
+  position:absolute;
+  top:0;left:0;width:100%;height:100%;
+  pointer-events:none;
+  z-index:15;
+}
+
+/* タップAFサークル */
 #focusCircle{
   position:absolute;
-  width:70px;
-  height:70px;
+  width:70px;height:70px;
   border:2px solid #FFD700;
   border-radius:50%;
   pointer-events:none;
@@ -39,187 +37,91 @@ video{
   box-shadow:0 0 0 1px rgba(0,0,0,0.4);
   transition:opacity 0.3s;
 }
-#focusCircle::before,
-#focusCircle::after{
-  content:'';
-  position:absolute;
-  background:#FFD700;
+#focusCircle::before,#focusCircle::after{
+  content:'';position:absolute;background:#FFD700;
 }
-/* 十字線 横 */
 #focusCircle::before{
-  width:10px;
-  height:1px;
-  top:50%;
-  left:-14px;
-  transform:translateY(-50%);
-  box-shadow:73px 0 0 #FFD700;
+  width:10px;height:1px;top:50%;left:-14px;
+  transform:translateY(-50%);box-shadow:73px 0 0 #FFD700;
 }
-/* 十字線 縦 */
 #focusCircle::after{
-  width:1px;
-  height:10px;
-  left:50%;
-  top:-14px;
-  transform:translateX(-50%);
-  box-shadow:0 73px 0 #FFD700;
+  width:1px;height:10px;left:50%;top:-14px;
+  transform:translateX(-50%);box-shadow:0 73px 0 #FFD700;
 }
 
-/* 共通ボタンスタイル */
-.shutterBtn{
+/* AFモード切替ボタン */
+#afModeBtn{
   position:absolute;
-  width:80px;
-  height:80px;
-  border-radius:50%;
-  background:#FFFFFF90;
-  border:4px solid rgba(255,255,255,0.5);
+  top:20px;right:20px;
+  padding:8px 14px;
+  border-radius:20px;
+  border:none;
+  background:rgba(0,0,0,0.55);
+  color:#FFD700;
+  font-size:0.85rem;
+  font-weight:bold;
   cursor:pointer;
-  z-index:10;
+  z-index:30;
+  letter-spacing:0.05em;
+}
+
+/* 共通ボタン */
+.shutterBtn{
+  position:absolute;width:80px;height:80px;border-radius:50%;
+  background:#FFFFFF90;border:4px solid rgba(255,255,255,0.5);cursor:pointer;z-index:10;
 }
 .switchCamBtn{
-  position:absolute;
-  width:50px;
-  height:50px;
-  border-radius:50%;
-  background:rgba(255,255,255,0.7);
-  border:none;
-  cursor:pointer;
-  z-index:10;
+  position:absolute;width:50px;height:50px;border-radius:50%;
+  background:rgba(255,255,255,0.7);border:none;cursor:pointer;z-index:10;
 }
 .zoomContainer{
-  position:absolute;
-  margin:auto;
-  color:white;
-  font-size:1rem;
-  z-index:10;
+  position:absolute;margin:auto;color:white;font-size:1rem;z-index:10;
 }
-#zoomSlider-bottom{
-  width:100%;
-}
-#zoomSlider-right{
-  height:100%;
-}
+#zoomSlider-bottom{width:100%;}
+#zoomSlider-right{height:100%;}
 
-/* 下部 */
-#shutterBtn-bottom{
-  bottom:40px;
-  left:50%;
-  transform:translateX(-50%);
-}
-#zoomContainer-bottom{
-  bottom:120px;
-  left:50%;
-  width:200px;
-  transform:translateX(-50%);
-  text-align:center;
-}
-#switchCamBtn-bottom{
-  bottom:180px;
-  left:50%;
-  transform:translateX(-50%);
-}
+#shutterBtn-bottom{bottom:40px;left:50%;transform:translateX(-50%);}
+#zoomContainer-bottom{bottom:120px;left:50%;width:200px;transform:translateX(-50%);text-align:center;}
+#switchCamBtn-bottom{bottom:180px;left:50%;transform:translateX(-50%);}
 
-/* 右方向 */
-#shutterBtn-right{
-  right:40px;
-  top:50%;
-  transform:translateY(-50%);
-}
-#zoomContainer-right{
-  right:120px;
-  top:50%;
-  height:200px;
-  transform:translateY(-50%);
-  transform:rotate(-0.25turn);
-  vertical-align:middle;
-}
-#switchCamBtn-right{
-  right:180px;
-  top:50%;
-  transform:translateY(-50%);
-}
+#shutterBtn-right{right:40px;top:50%;transform:translateY(-50%);}
+#zoomContainer-right{right:120px;top:50%;height:200px;transform:translateY(-50%);transform:rotate(-0.25turn);vertical-align:middle;}
+#switchCamBtn-right{right:180px;top:50%;transform:translateY(-50%);}
 
-/* ギャラリー関連 */
 #galleryBtn{
-  position:absolute;
-  bottom:40px;
-  left:20px;
-  width:60px;
-  height:60px;
-  border-radius:10px;
-  background:rgba(255,255,255,0.3);
-  border:none;
-  cursor:pointer;
-  overflow:hidden;
+  position:absolute;bottom:40px;left:20px;width:60px;height:60px;
+  border-radius:10px;background:rgba(255,255,255,0.3);border:none;cursor:pointer;overflow:hidden;
 }
 #galleryOverlay{
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  background:rgba(0,0,0,0.8);
-  display:none;
-  flex-direction:column;
-  justify-content:center;
-  align-items:center;
-  overflow-y:auto;
-  padding:20px;
-  box-sizing:border-box;
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.8);display:none;flex-direction:column;
+  justify-content:center;align-items:center;overflow-y:auto;padding:20px;box-sizing:border-box;
 }
 #galleryButtons{
-  position:fixed;
-  top:20px;
-  right:15px;
-  display:flex;
-  flex-direction:column;
-  align-items:flex-end;
-  gap:20px;
-  z-index:1000;
+  position:fixed;top:20px;right:15px;display:flex;flex-direction:column;
+  align-items:flex-end;gap:20px;z-index:1000;
 }
 .galleryControlBtn{
-  width:160px;
-  padding:14px 0;
-  font-size:1.1rem;
-  text-align:center;
-  border:none;
-  border-radius:8px;
-  background:rgba(255,255,255,0.9);
-  color:#000;
-  cursor:pointer;
-  box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  width:160px;padding:14px 0;font-size:1.1rem;text-align:center;
+  border:none;border-radius:8px;background:rgba(255,255,255,0.9);color:#000;
+  cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3);
 }
 #galleryImages{
-  margin-top:140px;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:20px;
+  margin-top:140px;display:flex;flex-direction:column;align-items:center;gap:20px;
 }
-.galleryItem img{
-  max-width:80vw;
-  max-height:60vh;
-  display:block;
-  margin-bottom:10px;
-}
+.galleryItem img{max-width:80vw;max-height:60vh;display:block;margin-bottom:10px;}
 .galleryItem button{
-  display:block;
-  width:120px;
-  margin:10px auto;
-  padding:10px 0;
-  border:none;
-  border-radius:6px;
-  background:rgba(255,255,255,0.9);
-  cursor:pointer;
+  display:block;width:120px;margin:10px auto;padding:10px 0;
+  border:none;border-radius:6px;background:rgba(255,255,255,0.9);cursor:pointer;
 }
 </style>
 </head>
 <body>
 <div id="cameraContainer">
   <video id="camera" autoplay playsinline></video>
-
-  <!-- フォーカスサークル -->
+  <canvas id="afCanvas"></canvas>
   <div id="focusCircle"></div>
-
+  <button id="afModeBtn">👆 タップAF</button>
   <button id="galleryBtn">📷</button>
 
   <!-- 下 -->
@@ -250,42 +152,251 @@ video{
 
 <script>
 const video=document.getElementById('camera');
+const afCanvas=document.getElementById('afCanvas');
+const ctx2d=afCanvas.getContext('2d');
+const focusCircle=document.getElementById('focusCircle');
+const afModeBtn=document.getElementById('afModeBtn');
 const galleryBtn=document.getElementById('galleryBtn');
 const galleryOverlay=document.getElementById('galleryOverlay');
 const closeGalleryBtn=document.getElementById('closeGalleryBtn');
 const shareAllBtn=document.getElementById('shareAllBtn');
 const downloadAllBtn=document.getElementById('downloadAllBtn');
 const galleryImages=document.getElementById('galleryImages');
-const focusCircle=document.getElementById('focusCircle');
 
 let currentStream=null;
 let useFrontCamera=false;
 let photos=[];
 let focusTimer=null;
-
+let isPinching=false;
 let pinchStartDist=0;
 let pinchStartZoom=1;
-let isPinching=false;
+
+// AFモード: 'tap' | 'face'
+let afMode='tap';
 
 const shutterButtons=document.querySelectorAll('.shutterBtn');
 const zoomSliders=document.querySelectorAll('input[type=range]');
 const zoomValues=document.querySelectorAll('.zoomValue');
 const switchCamButtons=document.querySelectorAll('.switchCamBtn');
 
-async function startCamera(){
-  if(currentStream){
-    currentStream.getTracks().forEach(t=>t.stop());
+// ---- 顔認識 (FaceDetector API) ----
+let faceDetector=null;
+let faceLoopRunning=false;
+
+function initFaceDetector(){
+  if('FaceDetector' in window){
+    faceDetector=new FaceDetector({fastMode:true,maxDetectedFaces:5});
+    return true;
   }
+  return false;
+}
+
+function startFaceDetection(){
+  if(!faceDetector) return;
+  faceLoopRunning=true;
+
+  async function loop(){
+    if(!faceLoopRunning) return;
+    if(video.readyState>=2){
+      try{
+        const faces=await faceDetector.detect(video);
+        drawFaceBoxes(faces);
+        if(faces.length>0){
+          const f=faces[0];
+          const nx=(f.boundingBox.x+f.boundingBox.width/2)/video.videoWidth;
+          const ny=(f.boundingBox.y+f.boundingBox.height/2)/video.videoHeight;
+          applyFocusPoint(nx,ny);
+        } else {
+          clearFaceBoxes();
+        }
+      }catch(e){}
+    }
+    if(faceLoopRunning) requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+
+function stopFaceDetection(){
+  faceLoopRunning=false;
+  clearFaceBoxes();
+}
+
+function resizeCanvas(){
+  if(afCanvas.width!==afCanvas.offsetWidth||afCanvas.height!==afCanvas.offsetHeight){
+    afCanvas.width=afCanvas.offsetWidth;
+    afCanvas.height=afCanvas.offsetHeight;
+  }
+}
+
+function drawFaceBoxes(faces){
+  resizeCanvas();
+  ctx2d.clearRect(0,0,afCanvas.width,afCanvas.height);
+  if(!faces.length) return;
+
+  const rect=video.getBoundingClientRect();
+  const scaleX=rect.width/video.videoWidth;
+  const scaleY=rect.height/video.videoHeight;
+
+  faces.forEach((f,i)=>{
+    const x=f.boundingBox.x*scaleX;
+    const y=f.boundingBox.y*scaleY;
+    const w=f.boundingBox.width*scaleX;
+    const h=f.boundingBox.height*scaleY;
+    const color=i===0?'#FFD700':'#00CFFF';
+    const cl=Math.min(w,h)*0.22;
+
+    ctx2d.strokeStyle=color;
+    ctx2d.lineWidth=2.5;
+
+    // コーナーブラケット
+    [[x,y,1,1],[x+w,y,-1,1],[x,y+h,1,-1],[x+w,y+h,-1,-1]].forEach(([cx,cy,dx,dy])=>{
+      ctx2d.beginPath();
+      ctx2d.moveTo(cx+dx*cl,cy);
+      ctx2d.lineTo(cx,cy);
+      ctx2d.lineTo(cx,cy+dy*cl);
+      ctx2d.stroke();
+    });
+
+    if(i===0){
+      ctx2d.fillStyle='rgba(255,215,0,0.9)';
+      ctx2d.font='bold 12px sans-serif';
+      ctx2d.fillText('AF',x+4,y>16?y-6:y+h+16);
+    }
+  });
+}
+
+function clearFaceBoxes(){
+  resizeCanvas();
+  ctx2d.clearRect(0,0,afCanvas.width,afCanvas.height);
+}
+
+// ---- フォーカスポイント適用 ----
+async function applyFocusPoint(nx,ny){
+  const track=currentStream?.getVideoTracks()[0];
+  if(!track) return;
+  const cap=track.getCapabilities?.();
+  if(cap?.focusMode?.includes('manual')&&cap?.pointsOfInterest){
+    try{
+      await track.applyConstraints({advanced:[{focusMode:'manual',pointsOfInterest:[{x:nx,y:ny}]}]});
+    }catch(e){}
+  }
+}
+
+// ---- タップAF ----
+async function applyTapFocus(nx,ny,clientX,clientY){
+  focusCircle.style.left=clientX+'px';
+  focusCircle.style.top=clientY+'px';
+  focusCircle.style.display='block';
+  focusCircle.style.opacity='1';
+  focusCircle.style.transform='translate(-50%,-50%) scale(1.3)';
+  focusCircle.style.transition='transform 0.15s ease, opacity 0.3s';
+  requestAnimationFrame(()=>{ focusCircle.style.transform='translate(-50%,-50%) scale(1)'; });
+
+  if(focusTimer) clearTimeout(focusTimer);
+  focusTimer=setTimeout(()=>{
+    focusCircle.style.opacity='0';
+    setTimeout(()=>focusCircle.style.display='none',300);
+  },2000);
+
+  await applyFocusPoint(nx,ny);
+
+  const track=currentStream?.getVideoTracks()[0];
+  const cap=track?.getCapabilities?.();
+  setTimeout(async()=>{
+    if(cap?.focusMode?.includes('continuous')){
+      try{ await track.applyConstraints({advanced:[{focusMode:'continuous'}]}); }catch(e){}
+    }
+  },1500);
+}
+
+// ---- AFモード切替 ----
+afModeBtn.addEventListener('click',()=>{
+  if(afMode==='tap'){
+    if(!faceDetector&&!initFaceDetector()){
+      alert('このブラウザは顔認識AF（FaceDetector API）に対応していません。\nChrome for Android などでお試しください。');
+      return;
+    }
+    afMode='face';
+    afModeBtn.textContent='😊 顔認識AF';
+    focusCircle.style.display='none';
+    startFaceDetection();
+  } else {
+    afMode='tap';
+    afModeBtn.textContent='👆 タップAF';
+    stopFaceDetection();
+  }
+});
+
+// ---- タップ・ピンチ ----
+const container=document.getElementById('cameraContainer');
+
+container.addEventListener('touchstart',e=>{
+  if(e.touches.length===2){
+    isPinching=true;
+    pinchStartDist=Math.hypot(
+      e.touches[0].clientX-e.touches[1].clientX,
+      e.touches[0].clientY-e.touches[1].clientY
+    );
+    const track=currentStream?.getVideoTracks()[0];
+    pinchStartZoom=track?.getSettings()?.zoom||parseFloat(zoomSliders[0].value);
+  } else {
+    isPinching=false;
+  }
+},{passive:true});
+
+container.addEventListener('touchend',e=>{
+  if(isPinching){ isPinching=false; return; }
+  if(afMode!=='tap') return;
+  if(e.target!==video&&e.target!==container&&e.target!==afCanvas) return;
+  if(e.changedTouches.length===1){
+    const t=e.changedTouches[0];
+    const rect=video.getBoundingClientRect();
+    applyTapFocus(
+      (t.clientX-rect.left)/rect.width,
+      (t.clientY-rect.top)/rect.height,
+      t.clientX,t.clientY
+    );
+  }
+},{passive:true});
+
+container.addEventListener('click',e=>{
+  if(afMode!=='tap') return;
+  if(e.target!==video&&e.target!==container&&e.target!==afCanvas) return;
+  const rect=video.getBoundingClientRect();
+  applyTapFocus(
+    (e.clientX-rect.left)/rect.width,
+    (e.clientY-rect.top)/rect.height,
+    e.clientX,e.clientY
+  );
+});
+
+container.addEventListener('touchmove',e=>{
+  if(e.touches.length===2){
+    e.preventDefault();
+    const newDist=Math.hypot(
+      e.touches[0].clientX-e.touches[1].clientX,
+      e.touches[0].clientY-e.touches[1].clientY
+    );
+    const scale=newDist/pinchStartDist;
+    const track=currentStream?.getVideoTracks()[0];
+    const cap=track?.getCapabilities?.();
+    if(cap?.zoom){
+      const newZoom=Math.min(cap.zoom.max,Math.max(cap.zoom.min,pinchStartZoom*scale));
+      applyZoom(newZoom);
+    }
+  }
+},{passive:false});
+
+// ---- カメラ ----
+async function startCamera(){
+  if(currentStream) currentStream.getTracks().forEach(t=>t.stop());
   currentStream=await navigator.mediaDevices.getUserMedia({
-    video:{
-      facingMode:useFrontCamera?'user':'environment',
-      width:{ ideal:9999 },
-      height:{ ideal:9999 },
-    },
+    video:{facingMode:useFrontCamera?'user':'environment',width:{ideal:9999},height:{ideal:9999}},
     audio:false
   });
   video.srcObject=currentStream;
   applyZoom(parseFloat(zoomSliders[0].value));
+  if(afMode==='face') startFaceDetection();
 }
 
 function applyZoom(value){
@@ -298,138 +409,30 @@ function applyZoom(value){
   }
 }
 
-// ---- タップAF ----
-async function applyFocus(x, y, clientX, clientY){
-  const track=currentStream?.getVideoTracks()[0];
-  if(!track) return;
-  const cap=track.getCapabilities?.();
-
-  // フォーカスサークル表示
-  focusCircle.style.left=clientX+'px';
-  focusCircle.style.top=clientY+'px';
-  focusCircle.style.display='block';
-  focusCircle.style.opacity='1';
-  focusCircle.style.transform='translate(-50%,-50%) scale(1.3)';
-  focusCircle.style.transition='transform 0.15s ease, opacity 0.3s';
-  requestAnimationFrame(()=>{
-    focusCircle.style.transform='translate(-50%,-50%) scale(1)';
-  });
-
-  // タイマーリセット
-  if(focusTimer) clearTimeout(focusTimer);
-  focusTimer=setTimeout(()=>{
-    focusCircle.style.opacity='0';
-    setTimeout(()=>focusCircle.style.display='none', 300);
-  }, 2000);
-
-  // focusPointOfInterest 対応チェック
-  if(cap?.focusMode && cap.focusMode.includes('manual') && cap?.pointsOfInterest){
-    try{
-      await track.applyConstraints({
-        advanced:[{
-          focusMode:'manual',
-          pointsOfInterest:[{x, y}]
-        }]
-      });
-      // フォーカス後に連続AFへ戻す（対応端末のみ）
-      setTimeout(async()=>{
-        if(cap.focusMode.includes('continuous')){
-          await track.applyConstraints({advanced:[{focusMode:'continuous'}]});
-        }
-      }, 1500);
-    }catch(e){
-      console.log('AF constraint error:', e);
-    }
-  }
-}
-
-// タップ検出（シングルタップのみ・ピンチと区別）
-const container=document.getElementById('cameraContainer');
-
-container.addEventListener('touchstart', e=>{
-  if(e.touches.length===2){
-    isPinching=true;
-    pinchStartDist=Math.hypot(
-      e.touches[0].clientX-e.touches[1].clientX,
-      e.touches[0].clientY-e.touches[1].clientY
-    );
-    const track=currentStream?.getVideoTracks()[0];
-    pinchStartZoom=track?.getSettings()?.zoom || parseFloat(zoomSliders[0].value);
-  } else {
-    isPinching=false;
-  }
-},{passive:true});
-
-container.addEventListener('touchend', e=>{
-  // ピンチ終了後の誤反応防止
-  if(isPinching){
-    isPinching=false;
-    return;
-  }
-  // ボタン上のタップは除外
-  if(e.target!==video && e.target!==container) return;
-  if(e.changedTouches.length===1){
-    const t=e.changedTouches[0];
-    const rect=video.getBoundingClientRect();
-    const x=(t.clientX-rect.left)/rect.width;
-    const y=(t.clientY-rect.top)/rect.height;
-    applyFocus(x, y, t.clientX, t.clientY);
-  }
-},{passive:true});
-
-// マウスでも動作（PC確認用）
-container.addEventListener('click', e=>{
-  if(e.target!==video && e.target!==container) return;
-  const rect=video.getBoundingClientRect();
-  const x=(e.clientX-rect.left)/rect.width;
-  const y=(e.clientY-rect.top)/rect.height;
-  applyFocus(x, y, e.clientX, e.clientY);
-});
-
-// ピンチズーム（videoからcontainerへ）
-container.addEventListener('touchmove', e=>{
-  if(e.touches.length===2){
-    e.preventDefault();
-    const newDist=Math.hypot(
-      e.touches[0].clientX-e.touches[1].clientX,
-      e.touches[0].clientY-e.touches[1].clientY
-    );
-    const scale=newDist/pinchStartDist;
-    const track=currentStream?.getVideoTracks()[0];
-    const cap=track?.getCapabilities?.();
-    if(cap?.zoom){
-      let newZoom=Math.min(cap.zoom.max, Math.max(cap.zoom.min, pinchStartZoom*scale));
-      applyZoom(newZoom);
-    }
-  }
-},{passive:false});
-
-// スライダー
 zoomSliders.forEach(slider=>{
   slider.addEventListener('input',e=>applyZoom(parseFloat(e.target.value)));
 });
 
-// カメラ切替
 switchCamButtons.forEach(btn=>{
   btn.addEventListener('click',()=>{
     useFrontCamera=!useFrontCamera;
+    stopFaceDetection();
     startCamera();
   });
 });
 
-// 撮影処理
+// ---- 撮影 ----
 shutterButtons.forEach(btn=>{
   btn.addEventListener('click',async()=>{
     const canvas=document.createElement('canvas');
     canvas.width=video.videoWidth;
     canvas.height=video.videoHeight;
-    const ctx=canvas.getContext('2d');
-    ctx.drawImage(video,0,0,canvas.width,canvas.height);
+    canvas.getContext('2d').drawImage(video,0,0);
 
     const now=new Date();
     const pad=n=>n.toString().padStart(2,'0');
-    const timestamp=`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    const filename=`${timestamp}.jpg`;
+    const ts=`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const filename=`${ts}.jpg`;
 
     const jpegDataURL=canvas.toDataURL('image/jpeg',0.92);
     let exifObj={"0th":{},"Exif":{},"GPS":{}};
@@ -440,8 +443,7 @@ shutterButtons.forEach(btn=>{
     const exifBytes=piexif.dump(exifObj);
     const newJpeg=piexif.insert(exifBytes,jpegDataURL);
 
-    const res=await fetch(newJpeg);
-    const blob=await res.blob();
+    const blob=await(await fetch(newJpeg)).blob();
     photos.unshift({blob,filename});
     galleryBtn.style.backgroundImage=`url(${URL.createObjectURL(blob)})`;
     galleryBtn.style.backgroundSize='cover';
@@ -452,10 +454,10 @@ shutterButtons.forEach(btn=>{
   });
 });
 
-// ギャラリー
+// ---- ギャラリー ----
 galleryBtn.addEventListener('click',()=>{
   galleryImages.innerHTML='';
-  photos.forEach((photo)=>{
+  photos.forEach(photo=>{
     const item=document.createElement('div');
     item.className='galleryItem';
     const img=document.createElement('img');
@@ -465,9 +467,8 @@ galleryBtn.addEventListener('click',()=>{
     shareBtn.textContent='共有';
     shareBtn.onclick=async()=>{
       const file=new File([photo.blob],photo.filename,{type:'image/jpeg'});
-      if(navigator.canShare && navigator.canShare({files:[file]})){
-        try{await navigator.share({files:[file],title:'写真共有'});}
-        catch(e){console.log(e);}
+      if(navigator.canShare&&navigator.canShare({files:[file]})){
+        try{await navigator.share({files:[file],title:'写真共有'});}catch(e){}
       }
     };
 
@@ -475,14 +476,10 @@ galleryBtn.addEventListener('click',()=>{
     dlBtn.textContent='ダウンロード';
     dlBtn.onclick=()=>{
       const a=document.createElement('a');
-      a.href=img.src;
-      a.download=photo.filename;
-      a.click();
+      a.href=img.src;a.download=photo.filename;a.click();
     };
 
-    item.appendChild(img);
-    item.appendChild(shareBtn);
-    item.appendChild(dlBtn);
+    item.append(img,shareBtn,dlBtn);
     galleryImages.appendChild(item);
   });
   galleryOverlay.style.display='flex';
@@ -490,9 +487,8 @@ galleryBtn.addEventListener('click',()=>{
 
 shareAllBtn.onclick=async()=>{
   const files=photos.map(p=>new File([p.blob],p.filename,{type:'image/jpeg'}));
-  if(navigator.canShare && navigator.canShare({files})){
-    try{await navigator.share({files,title:'全共有'});}
-    catch(e){console.log(e);}
+  if(navigator.canShare&&navigator.canShare({files})){
+    try{await navigator.share({files,title:'全共有'});}catch(e){}
   }
 };
 
@@ -502,9 +498,7 @@ downloadAllBtn.onclick=async()=>{
   const content=await zip.generateAsync({type:'blob'});
   const url=URL.createObjectURL(content);
   const a=document.createElement('a');
-  a.href=url;
-  a.download='photos.zip';
-  a.click();
+  a.href=url;a.download='photos.zip';a.click();
   URL.revokeObjectURL(url);
 };
 
