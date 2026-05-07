@@ -421,20 +421,85 @@ switchCamButtons.forEach(btn=>{
   });
 });
 
+// ---- シャープネス計測（ラプラシアン分散） ----
+function measureSharpness(videoEl){
+  const sw=160, sh=Math.round(160*videoEl.videoHeight/videoEl.videoWidth);
+  const tmp=document.createElement('canvas');
+  tmp.width=sw; tmp.height=sh;
+  const tc=tmp.getContext('2d');
+  tc.drawImage(videoEl,0,0,sw,sh);
+  const {data}=tc.getImageData(0,0,sw,sh);
+  // グレースケール変換してラプラシアン計算
+  const gray=new Float32Array(sw*sh);
+  for(let i=0;i<sw*sh;i++) gray[i]=(data[i*4]*0.299+data[i*4+1]*0.587+data[i*4+2]*0.114);
+  let sum=0,count=0;
+  for(let y=1;y<sh-1;y++){
+    for(let x=1;x<sw-1;x++){
+      const lap=
+        -gray[(y-1)*sw+x]-gray[(y+1)*sw+x]
+        -gray[y*sw+(x-1)]-gray[y*sw+(x+1)]
+        +4*gray[y*sw+x];
+      sum+=lap*lap; count++;
+    }
+  }
+  return sum/count;
+}
+
+// ---- カウントダウンオーバーレイ ----
+const countdownEl=document.createElement('div');
+Object.assign(countdownEl.style,{
+  position:'fixed',top:'50%',left:'50%',
+  transform:'translate(-50%,-50%)',
+  fontSize:'96px',fontWeight:'bold',color:'white',
+  textShadow:'0 0 20px rgba(0,0,0,0.8)',
+  zIndex:'100',display:'none',pointerEvents:'none',
+  fontFamily:'sans-serif',lineHeight:'1'
+});
+document.body.appendChild(countdownEl);
+
+function showCountdown(n){
+  return new Promise(res=>{
+    countdownEl.style.display='block';
+    countdownEl.textContent=n;
+    countdownEl.style.opacity='1';
+    countdownEl.style.transform='translate(-50%,-50%) scale(1.2)';
+    countdownEl.style.transition='none';
+    requestAnimationFrame(()=>{
+      countdownEl.style.transition='transform 0.8s ease, opacity 0.8s ease';
+      countdownEl.style.transform='translate(-50%,-50%) scale(0.8)';
+      countdownEl.style.opacity='0.2';
+    });
+    setTimeout(res, 900);
+  });
+}
+
+let isShooting=false;
+
 // ---- 撮影 ----
 shutterButtons.forEach(btn=>{
   btn.addEventListener('click',async()=>{
-    const canvas=document.createElement('canvas');
-    canvas.width=video.videoWidth;
-    canvas.height=video.videoHeight;
-    canvas.getContext('2d').drawImage(video,0,0);
+    if(isShooting) return;
+    isShooting=true;
 
+    // 5フレーム取得し最もシャープなものを選択
+    const FRAMES=5, INTERVAL=120;
+    let bestCanvas=null, bestScore=-1;
+    for(let i=0;i<FRAMES;i++){
+      await new Promise(r=>setTimeout(r,INTERVAL));
+      const c=document.createElement('canvas');
+      c.width=video.videoWidth; c.height=video.videoHeight;
+      c.getContext('2d').drawImage(video,0,0);
+      const score=measureSharpness(video);
+      if(score>bestScore){ bestScore=score; bestCanvas=c; }
+    }
+
+    // JPEG + EXIF書き込み
     const now=new Date();
     const pad=n=>n.toString().padStart(2,'0');
     const ts=`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
     const filename=`${ts}.jpg`;
 
-    const jpegDataURL=canvas.toDataURL('image/jpeg',0.92);
+    const jpegDataURL=bestCanvas.toDataURL('image/jpeg',0.95);
     let exifObj={"0th":{},"Exif":{},"GPS":{}};
     const dateStr=`${now.getFullYear()}:${pad(now.getMonth()+1)}:${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     exifObj["0th"][piexif.ImageIFD.DateTime]=dateStr;
@@ -448,9 +513,10 @@ shutterButtons.forEach(btn=>{
     galleryBtn.style.backgroundImage=`url(${URL.createObjectURL(blob)})`;
     galleryBtn.style.backgroundSize='cover';
 
+    // シャッターフラッシュ
     const track=video.srcObject.getVideoTracks()[0];
     track.enabled=false;
-    setTimeout(()=>track.enabled=true,250);
+    setTimeout(()=>{ track.enabled=true; isShooting=false; },250);
   });
 });
 
