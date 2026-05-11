@@ -12,9 +12,9 @@
       "src": "icon.png",
       "type": "image/png",
       "sizes": "192x192",
-      "purpose": "any"
+      "purpose": "any maskable"
     }
   ],
-  "categories": ["utilities", "music"],
+  "categories": ["utilities"],
   "lang": "ja"
 }
