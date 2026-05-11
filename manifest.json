@@ -1,0 +1,20 @@
+{
+  "name": "web-camera",
+  "short_name": "camera",
+  "description": "カメラ",
+  "start_url": "https://moriwakiren-fucc.github.io/camera/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["utilities", "music"],
+  "lang": "ja"
+}
