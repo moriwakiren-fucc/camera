@@ -1,8 +1,8 @@
 {
   "name": "web-camera",
-  "short_name": "camera",
+  "short_name": "CAMERA",
   "description": "カメラ",
-  "start_url": "https://moriwakiren-fucc.github.io/camera/",
+  "start_url": "/camera/",
   "display": "standalone",
   "background_color": "#0a0a0f",
   "theme_color": "#0a0a0f",
